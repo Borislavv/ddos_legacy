@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	"sync"
 	"time"
 )
 
@@ -28,15 +29,18 @@ func main() {
 	defer close(osSigsCh)
 	signal.Notify(osSigsCh, os.Interrupt)
 
-	tester := service.NewTester(settings, tasksCh, errorsCh, stopProvidersCh, stopConsumersCh)
+	wg := &sync.WaitGroup{}
+	displayer := service.NewDisplayer(wg, 1000)
+	provider := service.NewProvider(wg, displayer, settings, tasksCh)
+	consumer := service.NewConsumer(wg, displayer, settings, tasksCh)
+	tester := service.NewTester(displayer, consumer, provider, settings, wg, tasksCh, errorsCh)
 	tester.Start()
 
 	for {
 		select {
 		case <-osSigsCh:
-			log.Println("user init. interrupting...")
+			displayer.Display("user init. interrupting...")
 			tester.Stop()
-			time.Sleep(time.Second * 3)
 			return
 		default:
 			if time.Since(start) > time.Second*14 {

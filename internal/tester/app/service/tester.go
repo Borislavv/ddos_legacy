@@ -2,33 +2,38 @@ package service
 
 import (
 	"github.com/Borislavv/ddos/internal/tester/domain/model"
-	"log"
 	"sync"
 )
 
 type Tester struct {
-	wg       *sync.WaitGroup
+	displayer IDisplayer
+	consumer  IConsumer
+	provider  IProvider
+
 	settings *model.Settings
+
+	wg       *sync.WaitGroup
 	tasksCh  chan *model.Task
 	errorsCh chan error
-	consumer *Consumer
-	provider *Provider
 }
 
 func NewTester(
+	displayer IDisplayer,
+	consumer IConsumer,
+	provider IProvider,
 	settings *model.Settings,
+	wg *sync.WaitGroup,
 	tasksCh chan *model.Task,
 	errorsCh chan error,
-	stopProvidersCh chan struct{},
-	stopConsumersCh chan struct{},
 ) *Tester {
 	return &Tester{
-		wg:       &sync.WaitGroup{},
-		settings: settings,
-		tasksCh:  tasksCh,
-		errorsCh: errorsCh,
-		consumer: NewConsumer(settings, tasksCh, stopConsumersCh),
-		provider: NewProvider(settings, tasksCh, stopProvidersCh),
+		wg:        wg,
+		displayer: displayer,
+		settings:  settings,
+		tasksCh:   tasksCh,
+		errorsCh:  errorsCh,
+		consumer:  consumer,
+		provider:  provider,
 	}
 }
 
@@ -37,6 +42,7 @@ func (t *Tester) Start() {
 		defer t.wg.Done()
 		t.wg.Add(1)
 
+		t.displayer.Start()
 		t.provider.Provide()
 		t.consumer.Consume()
 	}()
@@ -47,9 +53,9 @@ func (t *Tester) Stop() {
 		defer t.wg.Done()
 		t.wg.Add(1)
 
-		log.Println("stopping providers and consumers...")
 		t.provider.Stop()
 		t.consumer.Stop()
+		t.displayer.Stop()
 	}()
 
 	t.wg.Wait()

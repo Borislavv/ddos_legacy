@@ -1,16 +1,21 @@
 package service
 
 type ITester interface {
-	StartTest()
-	StopTest()
+	Start()
+	Stop()
 }
 
 type IConsumer interface {
-	StartConsuming()
-	StopConsuming()
+	Consume()
+	Stop()
 }
 
 type IProvider interface {
-	StartProviding()
-	StopProviding()
+	Provide()
+	Stop()
+}
+type IDisplayer interface {
+	Start()
+	Display(pattern string, args ...interface{})
+	Stop()
 }

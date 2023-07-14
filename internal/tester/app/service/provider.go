@@ -2,7 +2,6 @@ package service
 
 import (
 	"github.com/Borislavv/ddos/internal/tester/domain/model"
-	"log"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -10,38 +9,47 @@ import (
 )
 
 type Provider struct {
-	wg       *sync.WaitGroup
-	settings *model.Settings
-	tasksCh  chan *model.Task
-	stopCh   chan struct{}
+	mu        *sync.Mutex
+	wg        *sync.WaitGroup
+	wgInt     *sync.WaitGroup
+	displayer IDisplayer
+	settings  *model.Settings
+	tasksCh   chan *model.Task
+	stopCh    chan struct{}
 }
 
 func NewProvider(
+	wg *sync.WaitGroup,
+	displayer IDisplayer,
 	settings *model.Settings,
 	tasksCh chan *model.Task,
-	stopCh chan struct{},
 ) *Provider {
 	return &Provider{
-		wg:       &sync.WaitGroup{},
-		settings: settings,
-		tasksCh:  tasksCh,
-		stopCh:   stopCh,
+		mu:        &sync.Mutex{},
+		wg:        wg,
+		wgInt:     &sync.WaitGroup{},
+		displayer: displayer,
+		settings:  settings,
+		tasksCh:   tasksCh,
+		stopCh:    make(chan struct{}),
 	}
 }
 
 func (p *Provider) Provide() {
-	log.Printf("starting #%d providers...\n", p.settings.Providers.Total)
+	p.displayer.Display("starting #%d providers...", p.settings.Providers.Total)
 
 	for i := int64(1); i <= p.settings.Providers.Total; i++ {
 		go func(i int64) {
 			defer func() {
 				atomic.AddInt64(&p.settings.Providers.Active, -1)
 				p.wg.Done()
-				log.Printf("\t - #%d provider stopped\n", i)
+				p.wgInt.Done()
+				p.displayer.Display("\t - #%d provider stopped", i)
 			}()
 			atomic.AddInt64(&p.settings.Providers.Active, 1)
 			p.wg.Add(1)
-			log.Printf("\t - #%d provider started\n", i)
+			p.wgInt.Add(1)
+			p.displayer.Display("\t - #%d provider started", i)
 
 			for {
 				select {
@@ -59,13 +67,19 @@ func (p *Provider) Provide() {
 func (p *Provider) Stop() {
 	go func() {
 		p.wg.Add(1)
+		p.wgInt.Add(1)
 		defer p.wg.Done()
+		defer p.wgInt.Done()
 
-		log.Printf("stopping #%d providers...\n", p.settings.Providers.Active)
-		for i := int64(1); i <= p.settings.Providers.Total; i++ {
+		p.mu.Lock()
+		activeProviders := p.settings.Providers.Active
+		p.mu.Unlock()
+
+		p.displayer.Display("stopping #%d providers...", activeProviders)
+		for i := int64(1); i <= activeProviders; i++ {
 			p.stopCh <- struct{}{}
 		}
 	}()
 
-	p.wg.Wait()
+	p.wgInt.Wait()
 }
