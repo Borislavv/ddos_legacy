@@ -1,9 +1,13 @@
 package model
 
+import (
+	"github.com/Borislavv/ddos/internal/shared/infrastructure/network/safehttp"
+)
+
 type Task struct {
-	request *Request
+	Request *safehttp.Req
 }
 
-func NewTask(request *Request) *Task {
-	return &Task{request: request}
+func NewTask(request *safehttp.Req) *Task {
+	return &Task{Request: request}
 }

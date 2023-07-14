@@ -12,9 +12,8 @@ type Tester struct {
 
 	settings *model.Settings
 
-	wg       *sync.WaitGroup
-	tasksCh  chan *model.Task
-	errorsCh chan error
+	wg      *sync.WaitGroup
+	tasksCh chan *model.Task
 }
 
 func NewTester(
@@ -24,14 +23,12 @@ func NewTester(
 	settings *model.Settings,
 	wg *sync.WaitGroup,
 	tasksCh chan *model.Task,
-	errorsCh chan error,
 ) *Tester {
 	return &Tester{
 		wg:        wg,
 		displayer: displayer,
 		settings:  settings,
 		tasksCh:   tasksCh,
-		errorsCh:  errorsCh,
 		consumer:  consumer,
 		provider:  provider,
 	}

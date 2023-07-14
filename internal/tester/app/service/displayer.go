@@ -24,6 +24,10 @@ func (d *Displayer) Display(pattern string, args ...interface{}) {
 	d.infoCh.Write(fmt.Sprintf(pattern, args...))
 }
 
+func (d *Displayer) DisplayError(err error) {
+	d.infoCh.Write(err.Error())
+}
+
 func (d *Displayer) Start() {
 	go func() {
 		defer d.wg.Done()

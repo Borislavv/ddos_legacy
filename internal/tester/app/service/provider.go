@@ -1,11 +1,12 @@
 package service
 
 import (
+	"errors"
+	"github.com/Borislavv/ddos/internal/shared/infrastructure/network/safehttp"
 	"github.com/Borislavv/ddos/internal/tester/domain/model"
 	"net/http"
 	"sync"
 	"sync/atomic"
-	"time"
 )
 
 type Provider struct {
@@ -16,6 +17,7 @@ type Provider struct {
 	settings  *model.Settings
 	tasksCh   chan *model.Task
 	stopCh    chan struct{}
+	errorsCh  chan error
 }
 
 func NewProvider(
@@ -23,6 +25,7 @@ func NewProvider(
 	displayer IDisplayer,
 	settings *model.Settings,
 	tasksCh chan *model.Task,
+	errorsCh chan error,
 ) *Provider {
 	return &Provider{
 		mu:        &sync.Mutex{},
@@ -31,6 +34,7 @@ func NewProvider(
 		displayer: displayer,
 		settings:  settings,
 		tasksCh:   tasksCh,
+		errorsCh:  errorsCh,
 		stopCh:    make(chan struct{}),
 	}
 }
@@ -56,8 +60,16 @@ func (p *Provider) Provide() {
 				case <-p.stopCh:
 					return
 				default:
-					p.tasksCh <- model.NewTask(model.NewRequest(&http.Request{}))
-					time.Sleep(time.Millisecond * 100)
+					request, err := http.NewRequest(
+						"GET",
+						"http://0.0.0.0:8080/api/v1/pagedata?group_id=495&ref_id=152&url=https://betwinner.com/ru&geo=cy&language=ru",
+						nil,
+					)
+					if err != nil {
+						p.errorsCh <- errors.New("unable to create request: " + err.Error())
+						continue
+					}
+					p.tasksCh <- model.NewTask(safehttp.NewReq(request))
 				}
 			}
 		}(i)
