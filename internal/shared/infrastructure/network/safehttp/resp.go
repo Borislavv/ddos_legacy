@@ -7,23 +7,28 @@ import (
 )
 
 type Resp struct {
-	origin *http.Response
+	req  *Req
+	resp *http.Response
 }
 
-func NewResp(resp *http.Response) (*Resp, error) {
-	return &Resp{origin: resp}, nil
+func NewResp(resp *http.Response, req *Req) (*Resp, error) {
+	return &Resp{resp: resp, req: req}, nil
+}
+
+func (r *Resp) Req() *Req {
+	return r.req
 }
 
 func (r *Resp) Origin() *http.Response {
-	return r.origin
+	return r.resp
 }
 
 func (r *Resp) Status() string {
-	return r.origin.Status
+	return r.resp.Status
 }
 
 func (r *Resp) StatusCode() int {
-	return r.origin.StatusCode
+	return r.resp.StatusCode
 }
 
 func (r *Resp) Body() (string, error) {
@@ -32,7 +37,7 @@ func (r *Resp) Body() (string, error) {
 			log.Fatalln("resp: error occurred while closing body. " + err.Error())
 		}
 	}()
-	body, err := ioutil.ReadAll(r.origin.Body)
+	body, err := ioutil.ReadAll(r.resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -40,5 +45,5 @@ func (r *Resp) Body() (string, error) {
 }
 
 func (r *Resp) Close() error {
-	return r.origin.Body.Close()
+	return r.resp.Body.Close()
 }

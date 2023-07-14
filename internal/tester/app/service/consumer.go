@@ -74,7 +74,13 @@ func (c *Consumer) Consume() {
 						continue
 					}
 
-					c.displayer.Display("resp: %s", resp.Status())
+					dur, err := resp.Req().Timestamp.GetDuration()
+					if err != nil {
+						c.errorsCh <- errors.New("consumer stopped due to error: " + err.Error())
+						continue
+					}
+
+					c.displayer.Display("[dur: %s] resp: %s", resp.Status(), dur)
 
 					if err = resp.Close(); err != nil {
 						c.errorsCh <- errors.New("error occurred while closing resp.Body: " + err.Error())

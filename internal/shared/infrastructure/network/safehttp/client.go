@@ -42,7 +42,7 @@ func (c *Client) Unlock() {
 	}
 }
 
-func (c *Client) Do(request *Req) (*Resp, error) {
+func (c *Client) Do(req *Req) (*Resp, error) {
 	defer c.mu.Unlock()
 	c.mu.Lock()
 
@@ -55,26 +55,26 @@ func (c *Client) Do(request *Req) (*Resp, error) {
 		c.isAvailable = true
 	}()
 
-	if err := request.Timestamp.SetFrom(); err != nil {
+	if err := req.Timestamp.SetFrom(); err != nil {
 		return nil, errors.New("httpclient: " + err.Error())
 	}
 
-	resp, err := c.client.Do(request.Request)
+	resp, err := c.client.Do(req.Request)
 	if err != nil {
-		request.MarkFailed()
-		if errSec := request.Timestamp.SetTo(); errSec != nil {
+		req.MarkFailed()
+		if errSec := req.Timestamp.SetTo(); errSec != nil {
 			return nil, errors.New(err.Error() + ". " + errSec.Error())
 		}
 		return nil, err
 	}
 
-	if err = request.Timestamp.SetTo(); err != nil {
+	if err = req.Timestamp.SetTo(); err != nil {
 		return nil, err
 	}
 
-	if err = request.Timestamp.SetDuration(); err != nil {
+	if err = req.Timestamp.SetDuration(); err != nil {
 		return nil, err
 	}
 
-	return NewResp(resp)
+	return NewResp(resp, req)
 }
