@@ -12,6 +12,9 @@ type Resp struct {
 }
 
 func NewResp(resp *http.Response, req *Req) (*Resp, error) {
+	if resp.StatusCode != 200 && resp.StatusCode != 201 {
+		req.MarkFailed()
+	}
 	return &Resp{resp: resp, req: req}, nil
 }
 

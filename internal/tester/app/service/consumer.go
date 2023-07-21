@@ -2,8 +2,11 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Borislavv/ddos/internal/shared/infrastructure/network/safehttp"
 	"github.com/Borislavv/ddos/internal/tester/domain/model"
+	"github.com/Borislavv/ddos/internal/tester/infrastructure/helper"
+	"net/url"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,16 +18,19 @@ type Consumer struct {
 	wg              *sync.WaitGroup
 	wgInt           *sync.WaitGroup
 	displayer       IDisplayer
+	meter           IMeter
 	settings        *model.Settings
 	httpClientsPool *safehttp.Pool
 	tasksCh         chan *model.Task
 	stopCh          chan struct{}
 	errorsCh        chan error
+	counter         int64
 }
 
 func NewConsumer(
 	wg *sync.WaitGroup,
 	displayer IDisplayer,
+	meter IMeter,
 	settings *model.Settings,
 	tasksCh chan *model.Task,
 	errorsCh chan error,
@@ -34,8 +40,9 @@ func NewConsumer(
 		wg:              wg,
 		wgInt:           &sync.WaitGroup{},
 		displayer:       displayer,
+		meter:           meter,
 		settings:        settings,
-		httpClientsPool: safehttp.NewPool(25, time.Second*5),
+		httpClientsPool: safehttp.NewPool(25, time.Second*1),
 		tasksCh:         tasksCh,
 		errorsCh:        errorsCh,
 		stopCh:          make(chan struct{}),
@@ -65,25 +72,49 @@ func (c *Consumer) Consume() {
 				case task := <-c.tasksCh:
 					client, err := c.httpClientsPool.GetAvailable()
 					if err != nil {
-						c.errorsCh <- errors.New("consumer stopped due to error: " + err.Error())
+						c.errorsCh <- errors.New("consumer skipped iteration due to error: " + err.Error())
 						continue
 					}
+
+					timestamp := time.Now()
+
+					URL, err := url.Parse(fmt.Sprintf(task.Request.Request.URL.String()+"&timestamp=%d", timestamp.UnixMicro()))
+					if err != nil {
+						c.errorsCh <- errors.New("consumer skipped iteration due to error: " + err.Error())
+						continue
+					}
+					task.Request.Request.URL = URL
 					resp, err := client.Do(task.Request)
 					if err != nil {
-						c.errorsCh <- errors.New("consumer stopped due to error: " + err.Error())
+						c.errorsCh <- errors.New("consumer skipped iteration due to error: " + err.Error())
 						continue
 					}
-
-					dur, err := resp.Req().Timestamp.GetDuration()
+					_, err = resp.Body()
 					if err != nil {
-						c.errorsCh <- errors.New("consumer stopped due to error: " + err.Error())
+						c.errorsCh <- errors.New("consumer skipped iteration due to error: " + err.Error())
 						continue
 					}
+					c.meter.CommitReq(resp.Req())
 
-					c.displayer.Display("[dur: %s] resp: %s", resp.Status(), dur)
+					c.displayer.Display(
+						fmt.Sprintf(
+							"[#%d] [resp: %s] [dur: %s] [client->server: %s] [p: %s ] [req->resp: %s] [server->client: %s]",
+							atomic.AddInt64(&c.counter, 1),
+							resp.Status(),
+							time.Since(timestamp),
+							resp.Origin().Header.Get("Server-Timing-Client-To-Server-Duration"),
+							resp.Origin().Header.Get("Server-Timing"),
+							resp.Origin().Header.Get("Server-Timing-Request-To-Response-Duration"),
+							time.Since(helper.ParsePhpMicroTime(resp.Origin().Header.Get("Server-Timing-Response-Timestamp"))),
+							//helper.ParseMillisecondsDur(resp.Origin().Header.Get("Server-Timing-Client-To-Server-Duration")),
+							//helper.ParsePDur(resp.Origin().Header.Get("Server-Timing")),
+							//helper.ParseMillisecondsDur(resp.Origin().Header.Get("Server-Timing-Request-To-Response-Duration")),
+							//time.Since(helper.ParsePhpMicroTime(resp.Origin().Header.Get("Server-Timing-Response-Timestamp"))),
+						),
+					)
 
 					if err = resp.Close(); err != nil {
-						c.errorsCh <- errors.New("error occurred while closing resp.Body: " + err.Error())
+						c.errorsCh <- errors.New("consumer skipped iteration due to error occurred while closing resp.Body: " + err.Error())
 						continue
 					}
 				default:

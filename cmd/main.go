@@ -11,9 +11,10 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	runtime.GOMAXPROCS(runtime.NumCPU() - 1)
+	start := time.Now()
 
-	settings := model.NewSettings(15, 5, 2, time.Minute*5)
+	settings := model.NewSettings(15, 5, 1, 3, time.Minute*5)
 
 	tasksCh := make(chan *model.Task, settings.Workers.Total)
 	defer close(tasksCh)
@@ -24,10 +25,11 @@ func main() {
 	signal.Notify(osSigsCh, os.Interrupt)
 
 	wg := &sync.WaitGroup{}
-	displayer := service.NewDisplayer(wg, 1000)
+	meter := service.NewMeter(settings)
+	displayer := service.NewDisplayer(wg, 100, settings)
 	provider := service.NewProvider(wg, displayer, settings, tasksCh, errorsCh)
-	consumer := service.NewConsumer(wg, displayer, settings, tasksCh, errorsCh)
-	tester := service.NewTester(displayer, consumer, provider, settings, wg, tasksCh)
+	consumer := service.NewConsumer(wg, displayer, meter, settings, tasksCh, errorsCh)
+	tester := service.NewTester(displayer, consumer, provider, meter, settings, wg, tasksCh)
 
 	tester.Start()
 	defer tester.Stop()
@@ -40,6 +42,10 @@ func main() {
 		case err := <-errorsCh:
 			displayer.DisplayError(err)
 			return
+		default:
+			if time.Since(start) >= time.Minute*5 {
+				return
+			}
 		}
 	}
 }

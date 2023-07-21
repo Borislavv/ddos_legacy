@@ -15,7 +15,3 @@ func NewRequests(total int64) *Requests {
 
 	return reqs
 }
-
-func (r *Requests) IsSetRequests() bool {
-	return r.IsSet
-}

@@ -2,11 +2,13 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"github.com/Borislavv/ddos/internal/shared/infrastructure/network/safehttp"
 	"github.com/Borislavv/ddos/internal/tester/domain/model"
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 type Provider struct {
@@ -55,21 +57,28 @@ func (p *Provider) Provide() {
 			p.wgInt.Add(1)
 			p.displayer.Display("\t - #%d provider started", i)
 
+			n := i * 1000000
 			for {
 				select {
 				case <-p.stopCh:
 					return
 				default:
+					timestamp := time.Now()
+
 					request, err := http.NewRequest(
-						"GET",
-						"http://0.0.0.0:8080/api/v1/pagedata?group_id=495&ref_id=152&url=https://betwinner.com/ru&geo=cy&language=ru",
+						"GET", // https://seo-wp1xv3n-6558-swoole.lux.kube.xbet.lan
+						fmt.Sprintf(
+							"https://seo-master-timings.lux.kube.xbet.lan/api/v1/pagedata?group_id=455&ref_id=1&url=https://1xlite-522762%d.top/registration&geo=cy&language=ru",
+							n,
+						),
 						nil,
 					)
 					if err != nil {
 						p.errorsCh <- errors.New("unable to create request: " + err.Error())
 						continue
 					}
-					p.tasksCh <- model.NewTask(safehttp.NewReq(request))
+					p.tasksCh <- model.NewTask(safehttp.NewReq(request), timestamp)
+					n++
 				}
 			}
 		}(i)

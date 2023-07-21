@@ -9,6 +9,7 @@ type Tester struct {
 	displayer IDisplayer
 	consumer  IConsumer
 	provider  IProvider
+	meter     IMeter
 
 	settings *model.Settings
 
@@ -20,6 +21,7 @@ func NewTester(
 	displayer IDisplayer,
 	consumer IConsumer,
 	provider IProvider,
+	meter IMeter,
 	settings *model.Settings,
 	wg *sync.WaitGroup,
 	tasksCh chan *model.Task,
@@ -27,6 +29,7 @@ func NewTester(
 	return &Tester{
 		wg:        wg,
 		displayer: displayer,
+		meter:     meter,
 		settings:  settings,
 		tasksCh:   tasksCh,
 		consumer:  consumer,
@@ -39,6 +42,7 @@ func (t *Tester) Start() {
 		defer t.wg.Done()
 		t.wg.Add(1)
 
+		t.meter.Start()
 		t.displayer.Start()
 		t.provider.Provide()
 		t.consumer.Consume()
@@ -50,9 +54,11 @@ func (t *Tester) Stop() {
 		defer t.wg.Done()
 		t.wg.Add(1)
 
+		t.meter.Stop()
 		t.provider.Stop()
 		t.consumer.Stop()
 		t.displayer.Stop()
+		t.meter.Summary()
 	}()
 
 	t.wg.Wait()

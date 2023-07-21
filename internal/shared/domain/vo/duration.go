@@ -2,6 +2,7 @@ package vo
 
 import (
 	"errors"
+	"log"
 	"time"
 )
 
@@ -20,11 +21,11 @@ func NewDuration(duration time.Duration) *Duration {
 	return dur
 }
 
-func (t *Duration) GetDuration() (time.Duration, error) {
+func (t *Duration) GetDuration() time.Duration {
 	if !t.isInit {
-		return 0, errors.New("'duration' value was not initialized yet, probably 'from' was not set up")
+		log.Fatalln("'duration' value was not initialized yet, probably 'from' was not set up")
 	}
-	return t.value, nil
+	return t.value
 }
 
 func (t *Duration) SetDuration(duration time.Duration) error {

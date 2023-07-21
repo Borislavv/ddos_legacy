@@ -1,7 +1,5 @@
 package vo
 
-import "sync/atomic"
-
 type Providers struct {
 	Total  int64
 	Active int64
@@ -13,12 +11,4 @@ func NewProviders(total int64) *Providers {
 	}
 
 	return &Providers{Total: total}
-}
-
-func (p *Providers) Activate() {
-	atomic.AddInt64(&p.Active, 1)
-}
-
-func (p *Providers) Deactivate() {
-	atomic.AddInt64(&p.Active, -1)
 }
