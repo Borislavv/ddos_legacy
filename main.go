@@ -264,10 +264,6 @@ func printStat(stat *Stat) {
 	)
 }
 
-//func writer() chan string {
-//	//wg :=
-//}
-
 func main() {
 	osSigsCh := make(chan os.Signal, 1)
 	defer close(osSigsCh)
